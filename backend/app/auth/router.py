@@ -1,22 +1,34 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
-from app.auth.schemas import LoginRequest
+from app.auth.dependencies import get_current_user
+from app.auth.schemas import CurrentUserResponse, LoginRequest, TokenResponse
+from app.auth.service import authenticate_user, build_current_user_response
+from app.core.database import get_db
+from app.core.security import create_access_token
+from app.iam.models import User
 
 router = APIRouter()
 
 
-@router.post("/login")
-def login(_: LoginRequest) -> None:
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Authentication will be implemented in the IAM phase.",
+@router.post("/login", response_model=TokenResponse)
+def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+    user = authenticate_user(db, payload.email, payload.password)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return TokenResponse(
+        access_token=create_access_token(subject=str(user.id)),
+        user=build_current_user_response(user),
     )
 
 
-@router.get("/me")
-def get_current_user() -> None:
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Current user retrieval will be implemented in the IAM phase.",
-    )
-
+@router.get("/me", response_model=CurrentUserResponse)
+def read_current_user(
+    current_user: User = Depends(get_current_user),
+) -> CurrentUserResponse:
+    return build_current_user_response(current_user)
