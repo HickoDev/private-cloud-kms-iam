@@ -1,9 +1,12 @@
+from collections.abc import Callable
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.auth.service import get_user_by_id
 from app.core.database import get_db
+from app.core.permissions import Permission as PermissionEnum
 from app.core.security import decode_access_token
 from app.iam.models import User
 
@@ -42,3 +45,25 @@ def get_current_user(
         )
 
     return user
+
+
+def require_permissions(*required_permissions: PermissionEnum) -> Callable[..., User]:
+    def permission_dependency(
+        current_user: User = Depends(get_current_user),
+    ) -> User:
+        user_permissions = {
+            permission.name
+            for role in current_user.roles
+            for permission in role.permissions
+        }
+        required = {permission.value for permission in required_permissions}
+
+        if not required.issubset(user_permissions):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to perform this action.",
+            )
+
+        return current_user
+
+    return permission_dependency
