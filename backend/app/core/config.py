@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     jwt_secret_key: str = "change_me_to_a_long_random_secret"
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 60
-    master_key: str = "base64_encoded_32_byte_key_here"
+    master_key: str = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
     cors_origins: list[str] = ["http://localhost:5173"]
 
     model_config = SettingsConfigDict(
@@ -23,4 +23,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-
