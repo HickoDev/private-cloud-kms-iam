@@ -26,6 +26,8 @@ Start the full stack:
 docker compose up --build
 ```
 
+The backend runs database migrations and seeds the local demo data on startup.
+
 Services:
 
 ```text
@@ -55,4 +57,3 @@ This password is for local academic demonstration only.
 5. Audit logs
 6. React dashboard
 7. Tests and documentation
-
