@@ -1,2 +1,15 @@
-"""Audit Pydantic schemas will be added in the audit phase."""
+from datetime import datetime
 
+from pydantic import BaseModel
+
+
+class AuditLogResponse(BaseModel):
+    id: int
+    user_id: int | None
+    action: str
+    resource_type: str | None
+    resource_id: str | None
+    status: str
+    ip_address: str | None
+    details: str | None
+    created_at: datetime
