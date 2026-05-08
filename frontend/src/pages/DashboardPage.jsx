@@ -5,7 +5,7 @@ const stats = [
   { label: "Audit logs", value: "0" },
 ];
 
-export default function DashboardPage() {
+export default function DashboardPage({ user }) {
   return (
     <section className="page">
       <header className="page-header">
@@ -13,7 +13,7 @@ export default function DashboardPage() {
           <p className="eyebrow">Overview</p>
           <h1>Security Dashboard</h1>
         </div>
-        <span className="status-pill">Skeleton ready</span>
+        <span className="status-pill">{user?.roles?.[0] || "Authenticated"}</span>
       </header>
 
       <div className="stats-grid">
@@ -26,14 +26,9 @@ export default function DashboardPage() {
       </div>
 
       <section className="panel">
-        <h2>Current Build Step</h2>
-        <p>
-          The interface is wired as a dashboard shell. Real data will be added
-          after backend authentication, RBAC, KMS, and audit modules are
-          implemented.
-        </p>
+        <h2>Session</h2>
+        <p>{user?.email}</p>
       </section>
     </section>
   );
 }
-

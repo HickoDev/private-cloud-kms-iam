@@ -32,8 +32,30 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 button:hover {
   background: #1b4965;
+}
+
+.secondary-button {
+  width: 100%;
+  color: #22577a;
+  background: #e8f1f6;
+}
+
+.secondary-button:hover {
+  background: #d8eaf3;
+}
+
+.boot-screen {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  color: #526270;
 }
 
 .app-shell {
@@ -79,6 +101,24 @@ button:hover {
 .nav-list {
   display: grid;
   gap: 6px;
+}
+
+.user-panel {
+  display: grid;
+  gap: 8px;
+  margin-top: 28px;
+  border-top: 1px solid #e5ebf0;
+  padding-top: 18px;
+}
+
+.user-panel strong {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+
+.user-panel span {
+  color: #667785;
+  font-size: 13px;
 }
 
 .nav-link {
@@ -197,6 +237,15 @@ button:hover {
   gap: 16px;
 }
 
+.error-message {
+  margin: 0;
+  border: 1px solid #f3b4b4;
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: #8f1d1d;
+  background: #fff1f1;
+}
+
 label {
   display: grid;
   gap: 7px;
@@ -303,4 +352,3 @@ th {
     grid-template-columns: 1fr;
   }
 }
-

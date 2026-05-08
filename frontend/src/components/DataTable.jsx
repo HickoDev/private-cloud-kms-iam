@@ -10,16 +10,21 @@ export default function DataTable({ columns, rows }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={row.id}>
-              {columns.map((column) => (
-                <td key={column.key}>{row[column.key]}</td>
-              ))}
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={columns.length}>No records</td>
             </tr>
-          ))}
+          ) : (
+            rows.map((row) => (
+              <tr key={row.id}>
+                {columns.map((column) => (
+                  <td key={column.key}>{row[column.key]}</td>
+                ))}
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
     </div>
   );
 }
-

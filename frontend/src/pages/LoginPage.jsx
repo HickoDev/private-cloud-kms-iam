@@ -1,4 +1,28 @@
-export default function LoginPage() {
+import { useState } from "react";
+
+import { login } from "../services/authService.js";
+
+export default function LoginPage({ onLogin }) {
+  const [email, setEmail] = useState("admin@example.com");
+  const [password, setPassword] = useState("admin123");
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      const user = await login(email, password);
+      onLogin(user);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
     <section className="page narrow-page">
       <header className="page-header">
@@ -8,18 +32,30 @@ export default function LoginPage() {
         </div>
       </header>
 
-      <form className="form-panel">
+      <form className="form-panel" onSubmit={handleSubmit}>
         <label>
           Email
-          <input type="email" placeholder="admin@example.com" />
+          <input
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            required
+          />
         </label>
         <label>
           Password
-          <input type="password" placeholder="admin123" />
+          <input
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            required
+          />
         </label>
-        <button type="button">Sign in</button>
+        {error ? <p className="error-message">{error}</p> : null}
+        <button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Signing in" : "Sign in"}
+        </button>
       </form>
     </section>
   );
 }
-

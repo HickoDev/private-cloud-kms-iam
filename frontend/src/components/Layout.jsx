@@ -1,13 +1,20 @@
 const navItems = [
-  { href: "#/", label: "Dashboard" },
-  { href: "#/login", label: "Login" },
-  { href: "#/users", label: "Users" },
-  { href: "#/keys", label: "Keys" },
-  { href: "#/crypto", label: "Crypto" },
-  { href: "#/audit-logs", label: "Audit Logs" },
+  { href: "#/", label: "Dashboard", roles: [] },
+  { href: "#/users", label: "Users", roles: ["ADMIN"] },
+  { href: "#/keys", label: "Keys", roles: ["ADMIN", "KEY_MANAGER", "KEY_USER", "AUDITOR"] },
+  { href: "#/crypto", label: "Crypto", roles: ["ADMIN", "KEY_USER"] },
+  { href: "#/audit-logs", label: "Audit Logs", roles: ["ADMIN", "AUDITOR"] },
 ];
 
-export default function Layout({ children, currentPath }) {
+function canViewItem(user, item) {
+  if (!user) {
+    return item.href === "#/login";
+  }
+
+  return item.roles.length === 0 || item.roles.some((role) => user.roles.includes(role));
+}
+
+export default function Layout({ children, currentPath, user, onLogout }) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -20,7 +27,7 @@ export default function Layout({ children, currentPath }) {
         </div>
 
         <nav className="nav-list" aria-label="Main navigation">
-          {navItems.map((item) => {
+          {navItems.filter((item) => canViewItem(user, item)).map((item) => {
             const itemPath = item.href.replace("#", "");
             const isActive = currentPath === itemPath;
 
@@ -35,10 +42,19 @@ export default function Layout({ children, currentPath }) {
             );
           })}
         </nav>
+
+        {user ? (
+          <div className="user-panel">
+            <strong>{user.email}</strong>
+            <span>{user.roles.join(", ")}</span>
+            <button type="button" className="secondary-button" onClick={onLogout}>
+              Logout
+            </button>
+          </div>
+        ) : null}
       </aside>
 
       <main className="content">{children}</main>
     </div>
   );
 }
-
