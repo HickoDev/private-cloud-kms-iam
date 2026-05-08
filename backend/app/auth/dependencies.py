@@ -1,9 +1,10 @@
 from collections.abc import Callable
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
+from app.audit import service as audit_service
 from app.auth.service import get_user_by_id
 from app.core.database import get_db
 from app.core.permissions import Permission as PermissionEnum
@@ -49,7 +50,9 @@ def get_current_user(
 
 def require_permissions(*required_permissions: PermissionEnum) -> Callable[..., User]:
     def permission_dependency(
+        request: Request,
         current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db),
     ) -> User:
         user_permissions = {
             permission.name
@@ -59,6 +62,15 @@ def require_permissions(*required_permissions: PermissionEnum) -> Callable[..., 
         required = {permission.value for permission in required_permissions}
 
         if not required.issubset(user_permissions):
+            missing = sorted(required - user_permissions)
+            audit_service.log_action(
+                db,
+                user_id=current_user.id,
+                action="ACCESS_DENIED",
+                status=audit_service.STATUS_FAILED,
+                ip_address=audit_service.get_request_ip(request),
+                details=f"Missing permissions: {', '.join(missing)}.",
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have permission to perform this action.",
