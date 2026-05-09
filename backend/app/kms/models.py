@@ -33,6 +33,10 @@ class KmsKey(Base):
         back_populates="key",
         cascade="all, delete-orphan",
     )
+    access_entries: Mapped[list["KeyAccess"]] = relationship(
+        back_populates="key",
+        cascade="all, delete-orphan",
+    )
 
 
 class KeyVersion(Base):
@@ -57,3 +61,27 @@ class KeyVersion(Base):
     )
 
     key: Mapped[KmsKey] = relationship(back_populates="versions")
+
+
+class KeyAccess(Base):
+    __tablename__ = "key_access"
+    __table_args__ = (
+        UniqueConstraint("key_id", "user_id", name="uq_key_access_user"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    key_id: Mapped[int] = mapped_column(ForeignKey("kms_keys.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    can_encrypt: Mapped[bool] = mapped_column(Boolean, default=True)
+    can_decrypt: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
+
+    key: Mapped[KmsKey] = relationship(back_populates="access_entries")

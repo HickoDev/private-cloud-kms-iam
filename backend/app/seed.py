@@ -18,6 +18,7 @@ PERMISSION_DESCRIPTIONS = {
     PermissionEnum.ROLE_ASSIGN: "Assign roles to users.",
     PermissionEnum.KEY_READ: "View key metadata.",
     PermissionEnum.KEY_CREATE: "Create cryptographic keys.",
+    PermissionEnum.KEY_ACCESS_MANAGE: "Assign users to specific cryptographic keys.",
     PermissionEnum.KEY_DISABLE: "Disable cryptographic keys.",
     PermissionEnum.KEY_ROTATE: "Rotate cryptographic keys.",
     PermissionEnum.DATA_ENCRYPT: "Encrypt data.",

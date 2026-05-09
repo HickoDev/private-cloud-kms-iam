@@ -29,6 +29,22 @@ class KeyVersionResponse(BaseModel):
     rotated_at: datetime | None
 
 
+class KeyAccessGrantRequest(BaseModel):
+    user_id: int
+    can_encrypt: bool = True
+    can_decrypt: bool = True
+
+
+class KeyAccessResponse(BaseModel):
+    id: int
+    key_id: int
+    user_id: int
+    username: str
+    email: str
+    can_encrypt: bool
+    can_decrypt: bool
+
+
 class EncryptRequest(BaseModel):
     plaintext: str = Field(min_length=1)
 

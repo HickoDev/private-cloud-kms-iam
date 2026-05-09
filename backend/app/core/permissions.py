@@ -8,6 +8,7 @@ class Permission(StrEnum):
     ROLE_ASSIGN = "ROLE_ASSIGN"
     KEY_READ = "KEY_READ"
     KEY_CREATE = "KEY_CREATE"
+    KEY_ACCESS_MANAGE = "KEY_ACCESS_MANAGE"
     KEY_DISABLE = "KEY_DISABLE"
     KEY_ROTATE = "KEY_ROTATE"
     DATA_ENCRYPT = "DATA_ENCRYPT"
@@ -33,4 +34,3 @@ ROLE_PERMISSIONS: dict[str, set[Permission]] = {
         Permission.AUDIT_READ,
     },
 }
-

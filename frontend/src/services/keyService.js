@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from "./api.js";
+import { apiDelete, apiGet, apiPost } from "./api.js";
 
 export function listKeys() {
   return apiGet("/api/keys");
@@ -26,4 +26,16 @@ export function encryptData(keyId, plaintext) {
 
 export function decryptData(keyId, payload) {
   return apiPost(`/api/keys/${keyId}/decrypt`, payload);
+}
+
+export function listKeyAccess(keyId) {
+  return apiGet(`/api/keys/${keyId}/access`);
+}
+
+export function grantKeyAccess(keyId, payload) {
+  return apiPost(`/api/keys/${keyId}/access`, payload);
+}
+
+export function revokeKeyAccess(keyId, userId) {
+  return apiDelete(`/api/keys/${keyId}/access/${userId}`);
 }

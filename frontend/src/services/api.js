@@ -69,3 +69,10 @@ export function apiPut(path, body) {
     body: JSON.stringify(body),
   });
 }
+
+
+export function apiDelete(path) {
+  return apiRequest(path, {
+    method: "DELETE",
+  });
+}

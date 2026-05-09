@@ -1,8 +1,10 @@
 from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
 
+from app.iam.models import User
 from app.kms.crypto import (
     decrypt_text,
     encrypt_text,
@@ -10,12 +12,14 @@ from app.kms.crypto import (
     protect_key_material,
     unprotect_key_material,
 )
-from app.kms.models import KeyVersion, KmsKey
+from app.kms.models import KeyAccess, KeyVersion, KmsKey
 from app.kms.schemas import (
     DecryptRequest,
     DecryptResponse,
     EncryptRequest,
     EncryptResponse,
+    KeyAccessGrantRequest,
+    KeyAccessResponse,
     KeyCreateRequest,
     KeyResponse,
     KeyVersionResponse,
@@ -24,6 +28,7 @@ from app.kms.schemas import (
 SUPPORTED_ALGORITHM = "AES-256-GCM"
 STATUS_ACTIVE = "ACTIVE"
 STATUS_DISABLED = "DISABLED"
+VIEW_ALL_KEY_ROLES = {"ADMIN", "KEY_MANAGER", "AUDITOR"}
 
 
 def build_key_response(key: KmsKey) -> KeyResponse:
@@ -44,6 +49,27 @@ def build_key_response(key: KmsKey) -> KeyResponse:
     )
 
 
+def user_has_role(user: User, *role_names: str) -> bool:
+    allowed_roles = set(role_names)
+    return any(role.name in allowed_roles for role in user.roles)
+
+
+def can_view_all_keys(user: User) -> bool:
+    return user_has_role(user, *VIEW_ALL_KEY_ROLES)
+
+
+def build_access_response(access: KeyAccess, user: User) -> KeyAccessResponse:
+    return KeyAccessResponse(
+        id=access.id,
+        key_id=access.key_id,
+        user_id=access.user_id,
+        username=user.username,
+        email=user.email,
+        can_encrypt=access.can_encrypt,
+        can_decrypt=access.can_decrypt,
+    )
+
+
 def build_version_response(version: KeyVersion) -> KeyVersionResponse:
     return KeyVersionResponse(
         id=version.id,
@@ -55,13 +81,20 @@ def build_version_response(version: KeyVersion) -> KeyVersionResponse:
     )
 
 
-def list_keys(db: Session) -> list[KeyResponse]:
-    keys = (
-        db.query(KmsKey)
-        .options(selectinload(KmsKey.versions))
-        .order_by(KmsKey.id)
-        .all()
-    )
+def list_keys(db: Session, current_user: User) -> list[KeyResponse]:
+    query = db.query(KmsKey).options(selectinload(KmsKey.versions))
+
+    if not can_view_all_keys(current_user):
+        query = (
+            query.join(KeyAccess, KeyAccess.key_id == KmsKey.id)
+            .filter(
+                KeyAccess.user_id == current_user.id,
+                or_(KeyAccess.can_encrypt.is_(True), KeyAccess.can_decrypt.is_(True)),
+            )
+            .distinct()
+        )
+
+    keys = query.order_by(KmsKey.id).all()
     return [build_key_response(key) for key in keys]
 
 
@@ -78,6 +111,52 @@ def get_key(db: Session, key_id: int) -> KmsKey:
             detail="Key not found.",
         )
     return key
+
+
+def ensure_key_visible(db: Session, key_id: int, current_user: User) -> None:
+    if can_view_all_keys(current_user):
+        return
+
+    access = (
+        db.query(KeyAccess)
+        .filter(
+            KeyAccess.key_id == key_id,
+            KeyAccess.user_id == current_user.id,
+            or_(KeyAccess.can_encrypt.is_(True), KeyAccess.can_decrypt.is_(True)),
+        )
+        .one_or_none()
+    )
+    if access is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not assigned to this key.",
+        )
+
+
+def ensure_key_operation_access(
+    db: Session,
+    key_id: int,
+    current_user: User,
+    operation: str,
+) -> None:
+    if user_has_role(current_user, "ADMIN"):
+        return
+
+    column = KeyAccess.can_encrypt if operation == "encrypt" else KeyAccess.can_decrypt
+    access = (
+        db.query(KeyAccess)
+        .filter(
+            KeyAccess.key_id == key_id,
+            KeyAccess.user_id == current_user.id,
+            column.is_(True),
+        )
+        .one_or_none()
+    )
+    if access is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"You are not allowed to {operation} with this key.",
+        )
 
 
 def get_active_version(key: KmsKey) -> KeyVersion:
@@ -175,7 +254,12 @@ def rotate_key(db: Session, key_id: int) -> KeyResponse:
     return build_key_response(get_key(db, key.id))
 
 
-def list_versions(db: Session, key_id: int) -> list[KeyVersionResponse]:
+def list_versions(
+    db: Session,
+    key_id: int,
+    current_user: User,
+) -> list[KeyVersionResponse]:
+    ensure_key_visible(db, key_id, current_user)
     key = get_key(db, key_id)
     return [
         build_version_response(version)
@@ -187,7 +271,9 @@ def encrypt_data(
     db: Session,
     key_id: int,
     payload: EncryptRequest,
+    current_user: User,
 ) -> EncryptResponse:
+    ensure_key_operation_access(db, key_id, current_user, "encrypt")
     key = get_key(db, key_id)
     if key.status != STATUS_ACTIVE:
         raise HTTPException(
@@ -215,7 +301,9 @@ def decrypt_data(
     db: Session,
     key_id: int,
     payload: DecryptRequest,
+    current_user: User,
 ) -> DecryptResponse:
+    ensure_key_operation_access(db, key_id, current_user, "decrypt")
     key = get_key(db, key_id)
     key_version = next(
         (
@@ -244,3 +332,68 @@ def decrypt_data(
         ) from exc
 
     return DecryptResponse(plaintext=plaintext)
+
+
+def list_key_access(db: Session, key_id: int) -> list[KeyAccessResponse]:
+    get_key(db, key_id)
+    rows = (
+        db.query(KeyAccess, User)
+        .join(User, User.id == KeyAccess.user_id)
+        .filter(KeyAccess.key_id == key_id)
+        .order_by(User.email)
+        .all()
+    )
+    return [build_access_response(access, user) for access, user in rows]
+
+
+def grant_key_access(
+    db: Session,
+    key_id: int,
+    payload: KeyAccessGrantRequest,
+) -> KeyAccessResponse:
+    get_key(db, key_id)
+    user = db.query(User).filter(User.id == payload.user_id).one_or_none()
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found.",
+        )
+
+    access = (
+        db.query(KeyAccess)
+        .filter(KeyAccess.key_id == key_id, KeyAccess.user_id == payload.user_id)
+        .one_or_none()
+    )
+
+    if access is None:
+        access = KeyAccess(
+            key_id=key_id,
+            user_id=payload.user_id,
+            can_encrypt=payload.can_encrypt,
+            can_decrypt=payload.can_decrypt,
+        )
+        db.add(access)
+    else:
+        access.can_encrypt = payload.can_encrypt
+        access.can_decrypt = payload.can_decrypt
+
+    db.commit()
+    db.refresh(access)
+
+    return build_access_response(access, user)
+
+
+def revoke_key_access(db: Session, key_id: int, user_id: int) -> None:
+    access = (
+        db.query(KeyAccess)
+        .filter(KeyAccess.key_id == key_id, KeyAccess.user_id == user_id)
+        .one_or_none()
+    )
+    if access is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Key access entry not found.",
+        )
+
+    db.delete(access)
+    db.commit()

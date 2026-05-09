@@ -4,13 +4,21 @@ import DataTable from "../components/DataTable.jsx";
 import {
   createKey,
   disableKey,
+  grantKeyAccess,
   listKeyVersions,
+  listKeyAccess,
   listKeys,
+  revokeKeyAccess,
   rotateKey,
 } from "../services/keyService.js";
+import { listUsers } from "../services/userService.js";
 
 function canManageKeys(user) {
   return user?.permissions?.includes("KEY_CREATE");
+}
+
+function canManageKeyAccess(user) {
+  return user?.permissions?.includes("KEY_ACCESS_MANAGE");
 }
 
 function formatDate(value) {
@@ -21,6 +29,14 @@ export default function KeysPage({ user }) {
   const [keys, setKeys] = useState([]);
   const [versions, setVersions] = useState([]);
   const [selectedKey, setSelectedKey] = useState(null);
+  const [accessKey, setAccessKey] = useState(null);
+  const [accessList, setAccessList] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [accessForm, setAccessForm] = useState({
+    userId: "",
+    canEncrypt: true,
+    canDecrypt: true,
+  });
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -30,6 +46,7 @@ export default function KeysPage({ user }) {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const canManage = canManageKeys(user);
+  const canAssignAccess = canManageKeyAccess(user);
 
   const columns = useMemo(
     () => [
@@ -50,6 +67,15 @@ export default function KeysPage({ user }) {
             <button type="button" onClick={() => loadVersions(row)}>
               Versions
             </button>
+            {canAssignAccess ? (
+              <button
+                type="button"
+                className="secondary-button compact-button"
+                onClick={() => loadAccess(row)}
+              >
+                Access
+              </button>
+            ) : null}
             {canManage ? (
               <>
                 <button
@@ -74,7 +100,7 @@ export default function KeysPage({ user }) {
         ),
       },
     ],
-    [canManage],
+    [canAssignAccess, canManage],
   );
 
   async function loadKeys() {
@@ -153,6 +179,68 @@ export default function KeysPage({ user }) {
     }
   }
 
+  async function loadAccess(key) {
+    setError("");
+    setAccessKey(key);
+
+    try {
+      const [accessData, usersData] = await Promise.all([listKeyAccess(key.id), listUsers()]);
+      setAccessList(accessData);
+      setUsers(usersData.filter((item) => item.is_active));
+      const firstUser = usersData.find((item) => item.is_active);
+      setAccessForm({
+        userId: firstUser ? String(firstUser.id) : "",
+        canEncrypt: true,
+        canDecrypt: true,
+      });
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  function updateAccessForm(field, value) {
+    setAccessForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function handleGrantAccess(event) {
+    event.preventDefault();
+    if (!accessKey) {
+      return;
+    }
+
+    setError("");
+    setMessage("");
+
+    try {
+      await grantKeyAccess(accessKey.id, {
+        user_id: Number(accessForm.userId),
+        can_encrypt: accessForm.canEncrypt,
+        can_decrypt: accessForm.canDecrypt,
+      });
+      setMessage("Key access updated.");
+      await loadAccess(accessKey);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleRevokeAccess(entry) {
+    if (!accessKey) {
+      return;
+    }
+
+    setError("");
+    setMessage("");
+
+    try {
+      await revokeKeyAccess(accessKey.id, entry.user_id);
+      setMessage("Key access revoked.");
+      await loadAccess(accessKey);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   return (
     <section className="page">
       <header className="page-header">
@@ -208,6 +296,83 @@ export default function KeysPage({ user }) {
                 <span>{formatDate(version.created_at)}</span>
               </div>
             ))}
+          </div>
+        </section>
+      ) : null}
+
+      {accessKey ? (
+        <section className="form-panel">
+          <h2>Access for {accessKey.name}</h2>
+          <form className="nested-form" onSubmit={handleGrantAccess}>
+            <div className="form-grid">
+              <label>
+                User
+                <select
+                  value={accessForm.userId}
+                  onChange={(event) => updateAccessForm("userId", event.target.value)}
+                  required
+                >
+                  {users.length === 0 ? <option value="">No active users</option> : null}
+                  {users.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.email}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="checkbox-label align-end">
+                <input
+                  type="checkbox"
+                  checked={accessForm.canEncrypt}
+                  onChange={(event) => updateAccessForm("canEncrypt", event.target.checked)}
+                />
+                Can encrypt
+              </label>
+              <label className="checkbox-label align-end">
+                <input
+                  type="checkbox"
+                  checked={accessForm.canDecrypt}
+                  onChange={(event) => updateAccessForm("canDecrypt", event.target.checked)}
+                />
+                Can decrypt
+              </label>
+            </div>
+            <div className="button-row">
+              <button type="submit" disabled={!accessForm.userId}>
+                Grant access
+              </button>
+              <button
+                type="button"
+                className="secondary-button compact-button"
+                onClick={() => setAccessKey(null)}
+              >
+                Close
+              </button>
+            </div>
+          </form>
+
+          <div className="access-list">
+            {accessList.length === 0 ? (
+              <p className="muted-text">No users assigned to this key.</p>
+            ) : (
+              accessList.map((entry) => (
+                <div className="access-item" key={entry.id}>
+                  <div>
+                    <strong>{entry.email}</strong>
+                    <span>
+                      encrypt={String(entry.can_encrypt)}, decrypt={String(entry.can_decrypt)}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="danger-button compact-button"
+                    onClick={() => handleRevokeAccess(entry)}
+                  >
+                    Revoke
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </section>
       ) : null}

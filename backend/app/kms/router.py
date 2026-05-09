@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.audit import service as audit_service
@@ -12,6 +12,8 @@ from app.kms.schemas import (
     DecryptResponse,
     EncryptRequest,
     EncryptResponse,
+    KeyAccessGrantRequest,
+    KeyAccessResponse,
     KeyCreateRequest,
     KeyResponse,
     KeyVersionResponse,
@@ -22,10 +24,10 @@ router = APIRouter()
 
 @router.get("", response_model=list[KeyResponse])
 def list_keys(
-    _: User = Depends(require_permissions(Permission.KEY_READ)),
+    current_user: User = Depends(require_permissions(Permission.KEY_READ)),
     db: Session = Depends(get_db),
 ) -> list[KeyResponse]:
-    return service.list_keys(db)
+    return service.list_keys(db, current_user)
 
 
 @router.post("", response_model=KeyResponse, status_code=status.HTTP_201_CREATED)
@@ -51,9 +53,10 @@ def create_key(
 @router.get("/{key_id}", response_model=KeyResponse)
 def get_key(
     key_id: int,
-    _: User = Depends(require_permissions(Permission.KEY_READ)),
+    current_user: User = Depends(require_permissions(Permission.KEY_READ)),
     db: Session = Depends(get_db),
 ) -> KeyResponse:
+    service.ensure_key_visible(db, key_id, current_user)
     return service.build_key_response(service.get_key(db, key_id))
 
 
@@ -100,10 +103,64 @@ def rotate_key(
 @router.get("/{key_id}/versions", response_model=list[KeyVersionResponse])
 def list_versions(
     key_id: int,
-    _: User = Depends(require_permissions(Permission.KEY_READ)),
+    current_user: User = Depends(require_permissions(Permission.KEY_READ)),
     db: Session = Depends(get_db),
 ) -> list[KeyVersionResponse]:
-    return service.list_versions(db, key_id)
+    return service.list_versions(db, key_id, current_user)
+
+
+@router.get("/{key_id}/access", response_model=list[KeyAccessResponse])
+def list_key_access(
+    key_id: int,
+    _: User = Depends(require_permissions(Permission.KEY_ACCESS_MANAGE)),
+    db: Session = Depends(get_db),
+) -> list[KeyAccessResponse]:
+    return service.list_key_access(db, key_id)
+
+
+@router.post("/{key_id}/access", response_model=KeyAccessResponse)
+def grant_key_access(
+    key_id: int,
+    payload: KeyAccessGrantRequest,
+    request: Request,
+    current_user: User = Depends(require_permissions(Permission.KEY_ACCESS_MANAGE)),
+    db: Session = Depends(get_db),
+) -> KeyAccessResponse:
+    access = service.grant_key_access(db, key_id, payload)
+    audit_service.log_action(
+        db,
+        user_id=current_user.id,
+        action="KEY_ACCESS_GRANTED",
+        resource_type="KEY",
+        resource_id=str(key_id),
+        ip_address=audit_service.get_request_ip(request),
+        details=(
+            f"Granted key access to {access.email}: "
+            f"encrypt={access.can_encrypt}, decrypt={access.can_decrypt}."
+        ),
+    )
+    return access
+
+
+@router.delete("/{key_id}/access/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_key_access(
+    key_id: int,
+    user_id: int,
+    request: Request,
+    current_user: User = Depends(require_permissions(Permission.KEY_ACCESS_MANAGE)),
+    db: Session = Depends(get_db),
+) -> Response:
+    service.revoke_key_access(db, key_id, user_id)
+    audit_service.log_action(
+        db,
+        user_id=current_user.id,
+        action="KEY_ACCESS_REVOKED",
+        resource_type="KEY",
+        resource_id=str(key_id),
+        ip_address=audit_service.get_request_ip(request),
+        details=f"Revoked key access for user {user_id}.",
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/{key_id}/encrypt", response_model=EncryptResponse)
@@ -114,7 +171,7 @@ def encrypt(
     current_user: User = Depends(require_permissions(Permission.DATA_ENCRYPT)),
     db: Session = Depends(get_db),
 ) -> EncryptResponse:
-    result = service.encrypt_data(db, key_id, payload)
+    result = service.encrypt_data(db, key_id, payload, current_user)
     audit_service.log_action(
         db,
         user_id=current_user.id,
@@ -135,7 +192,7 @@ def decrypt(
     current_user: User = Depends(require_permissions(Permission.DATA_DECRYPT)),
     db: Session = Depends(get_db),
 ) -> DecryptResponse:
-    result = service.decrypt_data(db, key_id, payload)
+    result = service.decrypt_data(db, key_id, payload, current_user)
     audit_service.log_action(
         db,
         user_id=current_user.id,

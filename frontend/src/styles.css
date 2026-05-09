@@ -253,6 +253,11 @@ button:hover {
   gap: 16px;
 }
 
+.nested-form {
+  display: grid;
+  gap: 16px;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -283,6 +288,11 @@ button:hover {
 
 .checkbox-label input {
   width: auto;
+}
+
+.align-end {
+  align-self: end;
+  min-height: 40px;
 }
 
 .error-message {
@@ -338,6 +348,30 @@ button:hover {
   align-items: center;
   border-bottom: 1px solid #e5ebf0;
   padding: 10px 0;
+}
+
+.access-list {
+  display: grid;
+  gap: 10px;
+}
+
+.access-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #e5ebf0;
+  padding: 10px 0;
+}
+
+.access-item div {
+  display: grid;
+  gap: 4px;
+}
+
+.access-item span {
+  color: #526270;
+  font-size: 13px;
 }
 
 label {
