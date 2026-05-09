@@ -103,6 +103,19 @@ def create_user(db: Session, payload: UserCreateRequest) -> UserResponse:
 def update_user(db: Session, user_id: int, payload: UserUpdateRequest) -> UserResponse:
     user = get_user(db, user_id)
 
+    if payload.is_active is False and any(role.name == "ADMIN" for role in user.roles):
+        active_admin_count = (
+            db.query(User)
+            .join(User.roles)
+            .filter(Role.name == "ADMIN", User.is_active.is_(True))
+            .count()
+        )
+        if active_admin_count <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot deactivate the only active admin user.",
+            )
+
     if payload.username is not None:
         duplicate = (
             db.query(User)

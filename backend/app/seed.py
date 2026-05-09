@@ -73,12 +73,15 @@ def seed() -> None:
                 roles=[role_by_name["ADMIN"]],
             )
             db.add(admin)
-        elif role_by_name["ADMIN"] not in admin.roles:
-            admin.roles.append(role_by_name["ADMIN"])
+        else:
+            admin.username = "admin"
+            admin.password_hash = hash_password("admin123")
+            admin.is_active = True
+            if role_by_name["ADMIN"] not in admin.roles:
+                admin.roles.append(role_by_name["ADMIN"])
 
         db.commit()
 
 
 if __name__ == "__main__":
     seed()
-
