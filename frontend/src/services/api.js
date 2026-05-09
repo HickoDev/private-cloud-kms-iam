@@ -53,3 +53,19 @@ export async function apiRequest(path, options = {}) {
 export function apiGet(path) {
   return apiRequest(path);
 }
+
+
+export function apiPost(path, body) {
+  return apiRequest(path, {
+    method: "POST",
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+
+export function apiPut(path, body) {
+  return apiRequest(path, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}

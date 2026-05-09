@@ -51,6 +51,22 @@ button:hover {
   background: #d8eaf3;
 }
 
+.danger-button {
+  color: #ffffff;
+  background: #a33a3a;
+}
+
+.danger-button:hover {
+  background: #842d2d;
+}
+
+.compact-button {
+  width: auto;
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
 .boot-screen {
   display: grid;
   min-height: 100vh;
@@ -237,6 +253,38 @@ button:hover {
   gap: 16px;
 }
 
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.button-row,
+.table-actions,
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.table-actions {
+  flex-wrap: nowrap;
+}
+
+.checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  gap: 7px;
+  color: #334756;
+  font-weight: 600;
+}
+
+.checkbox-label input {
+  width: auto;
+}
+
 .error-message {
   margin: 0;
   border: 1px solid #f3b4b4;
@@ -244,6 +292,52 @@ button:hover {
   padding: 10px 12px;
   color: #8f1d1d;
   background: #fff1f1;
+}
+
+.success-message {
+  margin: 0;
+  border: 1px solid #9ad0c2;
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: #215c50;
+  background: #e9f7f3;
+}
+
+.muted-text {
+  margin: 0;
+  color: #526270;
+}
+
+.result-box {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #d8e0e7;
+  border-radius: 6px;
+  padding: 12px;
+  background: #f7fafc;
+}
+
+.result-box span {
+  overflow-wrap: anywhere;
+  color: #334756;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    monospace;
+  font-size: 13px;
+}
+
+.version-list {
+  display: grid;
+  gap: 10px;
+}
+
+.version-item {
+  display: grid;
+  grid-template-columns: 80px 80px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid #e5ebf0;
+  padding: 10px 0;
 }
 
 label {
@@ -348,7 +442,12 @@ th {
   }
 
   .stats-grid,
-  .split-grid {
+  .split-grid,
+  .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .table-actions {
+    flex-wrap: wrap;
   }
 }

@@ -1,11 +1,43 @@
-const stats = [
-  { label: "Users", value: "0" },
-  { label: "Keys", value: "0" },
-  { label: "Active keys", value: "0" },
-  { label: "Audit logs", value: "0" },
-];
+import { useEffect, useState } from "react";
+
+import { listAuditLogs } from "../services/auditService.js";
+import { listKeys } from "../services/keyService.js";
+import { listUsers } from "../services/userService.js";
 
 export default function DashboardPage({ user }) {
+  const [stats, setStats] = useState([
+    { label: "Users", value: "-" },
+    { label: "Keys", value: "-" },
+    { label: "Active keys", value: "-" },
+    { label: "Audit logs", value: "-" },
+  ]);
+
+  useEffect(() => {
+    async function loadStats() {
+      const [usersResult, keysResult, auditResult] = await Promise.allSettled([
+        user?.permissions?.includes("USER_READ") ? listUsers() : Promise.resolve(null),
+        user?.permissions?.includes("KEY_READ") ? listKeys() : Promise.resolve(null),
+        user?.permissions?.includes("AUDIT_READ") ? listAuditLogs() : Promise.resolve(null),
+      ]);
+
+      const users = usersResult.status === "fulfilled" ? usersResult.value : null;
+      const keys = keysResult.status === "fulfilled" ? keysResult.value : null;
+      const auditLogs = auditResult.status === "fulfilled" ? auditResult.value : null;
+
+      setStats([
+        { label: "Users", value: users ? String(users.length) : "N/A" },
+        { label: "Keys", value: keys ? String(keys.length) : "N/A" },
+        {
+          label: "Active keys",
+          value: keys ? String(keys.filter((key) => key.status === "ACTIVE").length) : "N/A",
+        },
+        { label: "Audit logs", value: auditLogs ? String(auditLogs.length) : "N/A" },
+      ]);
+    }
+
+    loadStats();
+  }, [user]);
+
   return (
     <section className="page">
       <header className="page-header">
